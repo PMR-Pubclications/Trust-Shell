@@ -1,1 +1,1 @@
-git submodule add <URL_TO_YOUR_MAIN_TRUST_REPO> submodule/Trust
+git submodule add <https://github.com/Tole1775/Trust/tree/main> submodule/Trust
