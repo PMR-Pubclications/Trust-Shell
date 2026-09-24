@@ -1,0 +1,1 @@
+cp -r submodule/Trust/asset/html/* app/src/main/assets/www/ || echo "HTML assets sync skipped"
