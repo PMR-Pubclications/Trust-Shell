@@ -1,0 +1,2 @@
+rootProject.name = "Trust-Shell"
+include ':app'
