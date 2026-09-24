@@ -1,0 +1,11 @@
+      - name: Bundle Local Assets Into Native Container
+        run: |
+          echo "[INFO] Injecting offline forensic UI assets into shell container..."
+          mkdir -p app/src/main/assets
+          # Copy your core UI and report engines from your local build path or submodule
+          cp -r ../Trust/asset/html/* app/src/main/assets/ || true
+          
+      - name: Build Signed Release Package
+        run: |
+          # Compile native binary/APK with embedded local assets
+          ./gradlew assembleRelease
