@@ -1,0 +1,57 @@
+name: Build Trust Secure Shell
+
+on:
+  push:
+    branches: [ "main" ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-native-shell:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Native Shell Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Java Environment (Android SDK Target)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Setup Python Runtime Environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Grant Execution Permissions to Gradle
+        run: |
+          if [ -f "gradlew" ]; then
+            chmod +x gradlew
+          fi
+
+      - name: Compile Secure Shell Binary / APK
+        run: |
+          echo "[INFO] Initializing headless build sequence..."
+          # If building via Gradle (Android wrapper target):
+          if [ -f "build.gradle" ] || [ -f "build.gradle.kts" ]; then
+            ./gradlew assembleRelease
+          else
+            # Fallback for custom C++/Python native compilation script
+            python3 setup.py build
+          fi
+
+      - name: Upload Secure Shell Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: trust-secure-shell-package
+          path: |
+            build/outputs/apk/release/*.apk
+            dist/*
+            bin/*
+          retention-days: 30
