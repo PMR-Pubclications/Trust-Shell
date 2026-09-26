@@ -1,63 +1,44 @@
-#!/usr/bin/env python3
+#!/usr/init/env python3
 import time
-import subprocess
+import urllib.request
+import json
 import sys
-import os
 
 THRESHOLD_PERCENT = 85
-TEARDOWN_SCRIPT = "/opt/trustfence/bin/trust_teardown.py"
+# Points to your live server endpoint where Repository 2's webhook/listener is hosted
+TEARDOWN_WEBHOOK = "http://127.0.0.1:8080/trust-teardown"
 LOG_FILE = "/var/log/trustfence_memory.log"
 
 def get_memory_usage():
-    """Reads /proc/meminfo natively to calculate RAM usage percentage."""
-    meminfo = {}
     try:
         with open('/proc/meminfo', 'r') as f:
-            for line in f:
-                parts = line.split(':')
-                if len(parts) == 2:
-                    # Values are in kB by default
-                    meminfo[parts[0].strip()] = int(parts[1].split()[0])
-        
+            meminfo = {line.split(':')[0].strip(): int(line.split(':')[1].split()[0]) for line in f if ':' in line}
         total = meminfo.get('MemTotal', 0)
         available = meminfo.get('MemAvailable', meminfo.get('MemFree', 0))
-        if total == 0:
-            return 0.0
-        
-        used_percent = ((total - available) / total) * 100
-        return used_percent
+        return 0.0 if total == 0 else ((total - available) / total) * 100
     except Exception:
         return 0.0
 
-def log_message(msg):
-    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-    entry = f"[{timestamp}] [WATCHDOG] {msg}\n"
-    print(entry.strip())
-    try:
-        with open(LOG_FILE, 'a') as f:
-            f.write(entry)
-    except Exception:
-        pass
-
 def main():
-    log_message("Trustfence Python RAM Watchdog initialized.")
+    print("Trustfence Cloud Watchdog Initialized.")
     while True:
         try:
             usage = get_memory_usage()
             if usage >= THRESHOLD_PERCENT:
-                log_message(f"CRITICAL RAM PRESSURE: {usage:.1f}%. Initiating handshake trigger.")
+                print(f"Critical memory threshold reached: {usage:.1f}%")
                 
-                if os.path.exists(TEARDOWN_SCRIPT):
-                    # Handshake execution: Call the second Python script with argument
-                    subprocess.run([sys.executable, TEARDOWN_SCRIPT, "EMERGENCY_RAM_PRESSURE"], check=False)
-                else:
-                    log_message(f"ERROR: Teardown script missing at {TEARDOWN_SCRIPT}")
+                # Send HTTP POST handshake to trigger teardown remotely
+                data = json.dumps({"trigger": "EMERGENCY_RAM_PRESSURE"}).encode('utf-8')
+                req = urllib.request.Request(TEARDOWN_WEBHOOK, data=data, headers={'Content-Type': 'application/json'})
                 
-                # Cooldown period to prevent rapid trigger loops
+                try:
+                    urllib.request.urlopen(req, timeout=5)
+                except Exception as e:
+                    print(f"Webhook trigger failed: {e}")
+                
                 time.sleep(30)
-        except Exception as e:
-            log_message(f"Error in watchdog loop: {e}")
-        
+        except Exception:
+            pass
         time.sleep(5)
 
 if __name__ == "__main__":
