@@ -1,0 +1,46 @@
+name: Daily Diagnostic & Auto-Fix
+
+on:
+  schedule:
+    # Runs at 00:00 UTC every day (every 24 hours)
+    - cron: '0 0 * * *'
+  workflow_dispatch: # Allows manual trigger from the GitHub Actions tab
+
+jobs:
+  diagnose-and-fix:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Diagnostics
+        id: run_diagnostics
+        continue-on-error: true # Prevents workflow failure before attempting fix
+        run: |
+          echo "Running diagnostics..."
+          # Replace the line below with your actual diagnostic command
+          # Example: npm test, python check.py, or custom script
+          ./scripts/diagnose.sh
+
+      - name: Apply Auto-Fixes
+        if: steps.run_diagnostics.outcome != 'success'
+        run: |
+          echo "Diagnostics failed. Running repair commands..."
+          # Replace the line below with your actual fix/repair command
+          ./scripts/fix.sh
+
+      - name: Commit and Push Fixes
+        if: steps.run_diagnostics.outcome != 'success'
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          
+          # Only commit if changes were made by the fix script
+          if ! git diff --staged --quiet; then
+            git commit -m "fix: automatic daily diagnostic repair"
+            git push
+          else
+            echo "No changes were made by the fix script."
+          fi
