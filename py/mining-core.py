@@ -24,6 +24,15 @@ class TrustMiningDaemon:
             "stratum+ssl://btcssl.f2pool.com:1301"
         ]
         
+        # Phone's local IPv4 and IPv6 addresses configured for socket binding
+        self.local_ipv4 = "10.0.0.20"
+        self.local_ipv6_addresses = [
+            "fe80::1689:8454:118d:f234",
+            "2601:1c2:4088:fca0:885b:8687:167a:fa75",
+            "2601:1c2:4088:fca0:c9bf:5b27:163f:3ed2",
+            "2601:1c2:4088:fca0:c24:b1dd:fae2:5d31"
+        ]
+        
         self.current_endpoint_index = 0
         self.running = False
         self.socket_connection = None
@@ -56,18 +65,37 @@ class TrustMiningDaemon:
         return scheme, host, port
 
     def _connection_loop(self):
-        """Manages raw socket/SSL connections and automatic pool failover/reconnection logic."""
+        """Manages raw socket/SSL connections, local IP binding, and automatic failover."""
         while self.running:
             target_url = self.pool_endpoints[self.current_endpoint_index]
             scheme, host, port = self._parse_pool_url(target_url)
             
             try:
-                logging.info(f"Connecting to target pool -> {host}:{port} (Scheme: {scheme})...")
+                logging.info(f"Resolving and connecting to target pool -> {host}:{port} (Scheme: {scheme})...")
                 
-                # Establish raw TCP socket
-                base_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                # Resolve host to get address info (supports both IPv4 and IPv6 targets)
+                addr_info = socket.getaddrinfo(host, port, socket.AF_UNSPEC, socket.SOCK_STREAM)
+                target_family, socktype, proto, canonname, sa = addr_info[0]
+                
+                # Establish raw socket based on target address family
+                base_sock = socket.socket(target_family, socktype, proto)
                 base_sock.settimeout(30)
-                base_sock.connect((host, port))
+                
+                # Bind socket to the phone's specified local IP address matching the family
+                try:
+                    if target_family == socket.AF_INET:
+                        logging.info(f"Binding to local IPv4: {self.local_ipv4}")
+                        base_sock.bind((self.local_ipv4, 0))
+                    elif target_family == socket.AF_INET6:
+                        # Try binding to the first available non-link-local or fallback global IPv6
+                        selected_ipv6 = self.local_ipv6_addresses[1] # Prefer global scope over link-local (index 0 is fe80)
+                        logging.info(f"Binding to local IPv6: {selected_ipv6}")
+                        base_sock.bind((selected_ipv6, 0, 0, 0)) # IPv6 tuple requires flowinfo and scope_id
+                except Exception as bind_err:
+                    logging.warning(f"Local IP bind warning (continuing without strict bind): {bind_err}")
+
+                # Connect to pool
+                base_sock.connect(sa)
                 
                 # Wrap socket with SSL context if 'ssl' is specified in the stratum scheme
                 if "ssl" in scheme:
@@ -140,3 +168,12 @@ class TrustMiningDaemon:
         if self._thread:
             self._thread.join(timeout=3)
         logging.info("Mining daemon successfully terminated.")
+
+if __name__ == '__main__':
+    daemon = TrustMiningDaemon()
+    daemon.start()
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        daemon.stop()
