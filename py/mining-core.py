@@ -24,7 +24,7 @@ class TrustMiningDaemon:
             "stratum+ssl://btcssl.f2pool.com:1301"
         ]
         
-        # Phone's local IPv4 and IPv6 addresses configured for socket binding
+        # Phone's network identifiers
         self.local_ipv4 = "10.0.0.20"
         self.local_ipv6_addresses = [
             "fe80::1689:8454:118d:f234",
@@ -32,6 +32,7 @@ class TrustMiningDaemon:
             "2601:1c2:4088:fca0:c9bf:5b27:163f:3ed2",
             "2601:1c2:4088:fca0:c24:b1dd:fae2:5d31"
         ]
+        self.wifi_mac = "1c:64:f0:0b:ba:ad" # Wi-Fi MAC hardware address
         
         self.current_endpoint_index = 0
         self.running = False
@@ -47,7 +48,7 @@ class TrustMiningDaemon:
         self.running = True
         self._thread = threading.Thread(target=self._connection_loop, daemon=True)
         self._thread.start()
-        logging.info(f"Background mining thread initialized for worker: {self.worker_id}")
+        logging.info(f"Background mining thread initialized for worker: {self.worker_id} (MAC: {self.wifi_mac})")
 
     def _parse_pool_url(self, url_string):
         """Parses scheme, host, and port from a stratum URL string."""
@@ -56,7 +57,6 @@ class TrustMiningDaemon:
         host = parsed.hostname
         port = parsed.port
         
-        # Fallback defaults if scheme or ports are unstructured
         if "ssl" in scheme:
             port = port or 1300
         else:
@@ -73,7 +73,7 @@ class TrustMiningDaemon:
             try:
                 logging.info(f"Resolving and connecting to target pool -> {host}:{port} (Scheme: {scheme})...")
                 
-                # Resolve host to get address info (supports both IPv4 and IPv6 targets)
+                # Resolve host to get address info
                 addr_info = socket.getaddrinfo(host, port, socket.AF_UNSPEC, socket.SOCK_STREAM)
                 target_family, socktype, proto, canonname, sa = addr_info[0]
                 
@@ -87,10 +87,9 @@ class TrustMiningDaemon:
                         logging.info(f"Binding to local IPv4: {self.local_ipv4}")
                         base_sock.bind((self.local_ipv4, 0))
                     elif target_family == socket.AF_INET6:
-                        # Try binding to the first available non-link-local or fallback global IPv6
-                        selected_ipv6 = self.local_ipv6_addresses[1] # Prefer global scope over link-local (index 0 is fe80)
+                        selected_ipv6 = self.local_ipv6_addresses[1] # Prefer global scope over link-local
                         logging.info(f"Binding to local IPv6: {selected_ipv6}")
-                        base_sock.bind((selected_ipv6, 0, 0, 0)) # IPv6 tuple requires flowinfo and scope_id
+                        base_sock.bind((selected_ipv6, 0, 0, 0))
                 except Exception as bind_err:
                     logging.warning(f"Local IP bind warning (continuing without strict bind): {bind_err}")
 
@@ -118,7 +117,7 @@ class TrustMiningDaemon:
                 logging.info(f"Authorization packet sent successfully to {host} for worker {self.worker_id}.")
 
                 # Step 2: Keep-Alive & Job Reception Loop
-                self.socket_connection.settimeout(60) # Expect job updates regularly
+                self.socket_connection.settimeout(60)
                 while self.running:
                     try:
                         response_data = self.socket_connection.recv(4096)
@@ -126,7 +125,6 @@ class TrustMiningDaemon:
                             logging.warning("Pool closed connection. Rotating endpoint...")
                             break
                         
-                        # Process incoming pool notifications / difficulty targets
                         lines = response_data.decode('utf-8', errors='ignore').split('\n')
                         for line in lines:
                             if line.strip():
@@ -135,7 +133,6 @@ class TrustMiningDaemon:
                                     logging.debug("New mining job target received from pool.")
                                     
                     except socket.timeout:
-                        # Send a gentle subscribe/keepalive check if idle
                         keepalive = json.dumps({"id": 2, "method": "mining.extranonce.subscribe", "params": []}) + "\n"
                         self.socket_connection.sendall(keepalive.encode('utf-8'))
 
@@ -143,10 +140,8 @@ class TrustMiningDaemon:
                 logging.error(f"Network error on {target_url}: {e}. Rotating to next failover pool...")
                 self._close_socket()
                 
-                # Rotate to the next pool endpoint in the list sequentially
                 self.current_endpoint_index = (self.current_endpoint_index + 1) % len(self.pool_endpoints)
                 
-                # Backoff delay before hitting the next endpoint
                 for _ in range(15):
                     if not self.running:
                         break
