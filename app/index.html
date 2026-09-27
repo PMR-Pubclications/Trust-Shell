@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trust Shell Initializer</title>
+    <style>
+        body {
+            background-color: #0d1117;
+            color: #c9d1d9;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 90vh;
+        }
+        .card {
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 24px;
+            max-width: 450px;
+            width: 100%;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+        .status-box {
+            background-color: #21262d;
+            border-left: 4px solid #f85149;
+            padding: 12px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            font-weight: bold;
+            color: #f85149;
+            text-align: center;
+        }
+        .status-box.complete {
+            border-left-color: #238636;
+            color: #3fb950;
+        }
+        .terms-box {
+            background-color: #0d1117;
+            border: 1px solid #30363d;
+            height: 120px;
+            overflow-y: scroll;
+            padding: 10px;
+            font-size: 0.85em;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+        label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9em;
+            cursor: not-allowed;
+            color: #8b949e;
+        }
+        label.active {
+            cursor: pointer;
+            color: #c9d1d9;
+        }
+        button {
+            margin-top: 20px;
+            width: 100%;
+            padding: 12px;
+            background-color: #21262d;
+            color: #8b949e;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: not-allowed;
+        }
+        button.enabled {
+            background-color: #238636;
+            color: #ffffff;
+            cursor: pointer;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>Initialization Setup</h2>
+    
+    <!-- Audio Element targeting raw GitHub media file -->
+    <audio id="introAudio" controls style="width: 100%; margin-bottom: 15px;">
+        <source src="https://raw.githubusercontent.com/PMR-Pubclications/Trust-Main/main/asset/podcast/the_trust_ferensics_app.mp3" type="audio/mpeg">
+        Your browser does not support audio elements.
+    </audio>
+
+    <div id="statusMessage" class="status-box">
+        You must finish the audio to proceed.
+    </div>
+
+    <div class="terms-box">
+        <h3>User Agreement & Resource Authorization</h3>
+        <p>By proceeding and checking the box below, you explicitly grant this application authorization to utilize background device processing power and telemetry operations (including hash computation and Bitcoin network verification routines) while the application is actively running.</p>
+    </div>
+
+    <label id="checkboxLabel">
+        <input type="checkbox" id="consentCheckbox" disabled>
+        I accept the user agreement and authorize background operations.
+    </label>
+
+    <button id="proceedBtn" disabled>Proceed to Application</button>
+</div>
+
+<script>
+    const audio = document.getElementById('introAudio');
+    const statusMessage = document.getElementById('statusMessage');
+    const consentCheckbox = document.getElementById('consentCheckbox');
+    const checkboxLabel = document.getElementById('checkboxLabel');
+    const proceedBtn = document.getElementById('proceedBtn');
+
+    // Check if user has previously agreed
+    if (localStorage.getItem('trust_consent_granted') === 'true') {
+        window.location.href = "main_app.html";
+    }
+
+    // Unlock agreement UI once audio completes
+    audio.addEventListener('ended', () => {
+        statusMessage.textContent = "Audio completed. You may now accept the agreement.";
+        statusMessage.classList.add('complete');
+        consentCheckbox.disabled = false;
+        checkboxLabel.classList.add('active');
+    });
+
+    // Handle Checkbox interaction
+    consentCheckbox.addEventListener('change', (e) => {
+        if (e.target.checked) {
+            proceedBtn.disabled = false;
+            proceedBtn.classList.add('enabled');
+        } else {
+            proceedBtn.disabled = true;
+            proceedBtn.classList.remove('enabled');
+        }
+    });
+
+    // Save state and enter application
+    proceedBtn.addEventListener('click', () => {
+        if (consentCheckbox.checked) {
+            localStorage.setItem('trust_consent_granted', 'true');
+            // Call native Android interface if present to initiate background tasks
+            if (window.AndroidInterface && window.AndroidInterface.startMiningService) {
+                window.AndroidInterface.startMiningService();
+            }
+            window.location.href = "main_app.html";
+        }
+    });
+</script>
+
+</body>
+</html>
