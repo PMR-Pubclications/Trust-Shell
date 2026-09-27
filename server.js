@@ -6,6 +6,20 @@ const app = express();
 // BACKGROUND MINER LIFECYCLE MANAGEMENT
 // ==========================================
 
+const express = require('path');
+const path = require('path');
+const app = express();
+
+// Trust-Shell acts as the secure gatekeeper, then serves the Main app payload locally
+const mainAppPath = path.join(__dirname, '../core-main-app/public');
+app.use(express.static(mainAppPath));
+
+// Bind ONLY to localhost to ensure external networks cannot touch the Main app directly
+app.listen(3000, '127.0.0.1', () => {
+    console.log('[+] Trust-Shell active. Main application securely mounted behind local loopback.');
+});
+
+
 // Path to your python miner script
 const pythonScriptPath = '/path/to/your/miner_script.py';
 
