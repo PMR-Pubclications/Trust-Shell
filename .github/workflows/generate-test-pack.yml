@@ -1,0 +1,43 @@
+name: Generate Account Test Pack
+
+on:
+  workflow_dispatch:
+    inputs:
+      account_id:
+        description: 'Target Account ID for Test Pack'
+        required: true
+        default: 'TEST_ACCT_DEFAULT'
+
+jobs:
+  build-test-pack:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Generate AI Change Summary
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          git diff HEAD~1 HEAD > diff.patch
+          node .github/scripts/generate_description.js || true
+
+      - name: Build & Package Account Test Pack
+        run: |
+          node scripts/build_test_pack.js
+
+      - name: Upload Test Pack Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.event.inputs.account_id }}_test_pack
+          path: dist/test_packs/*.tgz
