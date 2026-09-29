@@ -13,8 +13,8 @@ from datetime import datetime
 class MobileEnvironmentDispatcher:
     """
     Fluid OS Dispatcher for the lightweight Trust-Shell front-end.
-    Detects the active mobile/field operating system at runtime and dispatches 
-    the appropriate native hardware hooks before transmitting to the Linux server.
+    Detects the active mobile/field operating system at runtime and executes 
+    native hardware location calls before transmitting to the Linux server.
     """
 
     @staticmethod
@@ -50,18 +50,96 @@ class MobileEnvironmentDispatcher:
 
     @staticmethod
     def _query_android_location() -> dict:
-        """Hooks into Android FusedLocationProviderClient via native Java/JNI bridge."""
-        return {"lat": 45.6387, "lon": -122.6615, "alt": 52.0, "source": "android_fused_provider"}
+        """
+        Queries Android LocationManager / FusedLocationProvider using Pyjnius 
+        to access native Java Android APIs.
+        """
+        try:
+            from jnius import autoclass
+            PythonActivity = autoclass('org.kivy.android.PythonActivity')
+            Context = autoclass('android.content.Context')
+            LocationManager = autoclass('android.location.LocationManager')
+            
+            activity = PythonActivity.mActivity
+            loc_manager = activity.getSystemService(Context.LOCATION_SERVICE)
+            
+            # Request last known fix from GPS provider
+            location = loc_manager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+            if not location:
+                location = loc_manager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+                
+            if location:
+                return {
+                    "lat": float(location.getLatitude()),
+                    "lon": float(location.getLongitude()),
+                    "alt": float(location.getAltitude()),
+                    "source": "android_native_jnius_gps"
+                }
+        except Exception as e:
+            print(f"[GPS BRIDGE WARNING] Android native bridge exception: {e}")
+            
+        return {"lat": 0.0, "lon": 0.0, "alt": 0.0, "source": "android_bridge_unavailable"}
 
     @staticmethod
     def _query_ios_location() -> dict:
-        """Hooks into Apple CoreLocation framework via Objective-C/Swift bridge."""
-        return {"lat": 45.6387, "lon": -122.6615, "alt": 52.0, "source": "ios_core_location"}
+        """
+        Queries Apple CoreLocation framework via PyObjC bridge for iOS/iPadOS runtimes.
+        """
+        try:
+            from CoreLocation import CLLocationManager
+            # Initialize CoreLocation Manager to pull current coordinate fix
+            manager = CLLocationManager.alloc().init()
+            location = manager.location()
+            
+            if location:
+                coord = location.coordinate()
+                return {
+                    "lat": float(coord.latitude),
+                    "lon": float(coord.longitude),
+                    "alt": float(location.altitude()),
+                    "source": "ios_native_corelocation"
+                }
+        except Exception as e:
+            print(f"[GPS BRIDGE WARNING] iOS native bridge exception: {e}")
+            
+        return {"lat": 0.0, "lon": 0.0, "alt": 0.0, "source": "ios_bridge_unavailable"}
 
     @staticmethod
     def _query_windows_location() -> dict:
-        """Hooks into Windows.Devices.Geolocation WinRT API for rugged field tablets."""
-        return {"lat": 45.6387, "lon": -122.6615, "alt": 52.0, "source": "windows_winrt_geolocation"}
+        """
+        Queries Windows.Devices.Geolocation WinRT API via windows-sdk bindings 
+        for ruggedized Windows field tablets.
+        """
+        try:
+            import asyncio
+            import winsdk.windows.devices.geolocation as wdg
+            
+            async def get_winrt_position():
+                locator = wdg.Geolocator()
+                position = await locator.get_geoposition_async()
+                pos = position.coordinate.point.position
+                return {
+                    "lat": float(pos.latitude),
+                    "lon": float(pos.longitude),
+                    "alt": float(pos.altitude) if hasattr(pos, 'altitude') else 0.0,
+                    "source": "windows_winrt_geolocation"
+                }
+            
+            # Execute async WinRT call synchronously in Python
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # If an event loop is already active, create a new task or run block
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as pool:
+                    future = pool.submit(asyncio.run, get_winrt_position())
+                    return future.result(timeout=3)
+            else:
+                return loop.run_until_complete(get_winrt_position())
+                
+        except Exception as e:
+            print(f"[GPS BRIDGE WARNING] Windows WinRT bridge exception: {e}")
+            
+        return {"lat": 0.0, "lon": 0.0, "alt": 0.0, "source": "windows_bridge_unavailable"}
 
 
 class TrustBiometricGate:
@@ -124,7 +202,7 @@ class TrustBiometricGate:
         """
         [Protocol 3: Immutable JSON Audit Ledger]
         Catalogs the officer/agent credentials, precise timestamp, date, 
-        fluid OS GPS coordinates, and case log into a tamper-evident local JSON record.
+        live OS GPS hardware coordinates, and case log into a tamper-evident local JSON record.
         """
         now = datetime.now()
         audit_entry = {
@@ -138,7 +216,7 @@ class TrustBiometricGate:
             "security_layers": [
                 "Hardware Secure Enclave / StrongBox",
                 "Tier 1 Bio-Mechanical Voice Recognition",
-                "Fluid OS Native Hardware Telemetry"
+                "Live Native OS Hardware GPS Telemetry"
             ]
         }
 
@@ -162,7 +240,7 @@ class TrustBiometricGate:
     def authenticate_session(self, enclave_token: bytes, agent_id: str, case_log_id: str) -> bool:
         """
         Executes the full multi-modal verification sequence across all security protocols,
-        pulling fluid OS hardware location on the fly.
+        querying native OS hardware location live at the moment of clearance.
         """
         # Layer 1: Hardware Enclave Check
         if not self.verify_hardware_biometric_token(enclave_token):
@@ -172,12 +250,12 @@ class TrustBiometricGate:
         if not self.capture_and_verify_voiceprint():
             return False
 
-        # Layer 3: Dynamic OS Hardware GPS Retrieval
+        # Layer 3: Dynamic Native OS Hardware GPS Retrieval
         live_gps = MobileEnvironmentDispatcher.fetch_live_gps_hardware()
 
         # Layer 4: Seal Local Audit Ledger & Prepare Payload for Linux Server
         self.is_unlocked = True
         self.log_session_audit_trail(agent_id, live_gps, case_log_id)
         
-        print("[GATE] Multi-modal biometric authentication complete with fluid hardware telemetry. Vault unsealed.")
+        print("[GATE] Multi-modal biometric authentication complete with native hardware telemetry. Vault unsealed.")
         return True
