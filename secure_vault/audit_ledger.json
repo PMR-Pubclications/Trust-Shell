@@ -1,0 +1,10 @@
+gate = TrustBiometricGate()
+
+# Simulated input data from the field shell
+enclave_token = b'\x01' * 32  # 32-byte hardware token
+agent_id = "UNIT-402-ANTOLIC"
+gps_coords = {"lat": 45.6387, "lon": -122.6615, "alt": 52.0}
+case_log_id = "INC-2026-9921"
+
+# Run check
+success = gate.authenticate_session(enclave_token, agent_id, gps_coords, case_log_id)
