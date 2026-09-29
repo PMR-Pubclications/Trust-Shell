@@ -1,0 +1,42 @@
+name: Account Setup & First Package Release
+
+on:
+  repository_dispatch:
+    types: [account_created_event] # Triggered when a new user finishes account setup
+
+jobs:
+  build-and-release-package:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Generate AI Commit Description
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          git diff HEAD~1 HEAD > diff.patch
+          node .github/scripts/generate_description.js
+
+      - name: Inject Descriptions into Package Manifest
+        run: |
+          node scripts/release_provision.js
+
+      - name: Build and Publish Package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Optionally publish to private npm or build a bundle tarball
+          npm pack
+          echo "Package bundled and provisioned with full commit description."
