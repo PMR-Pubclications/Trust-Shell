@@ -1,0 +1,19 @@
+{
+  "name": "trust-shell",
+  "version": "1.0.0",
+  "description": "Trust Shell module with native C++ hardware bridge integration",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "install": "node-gyp rebuild",
+    "build:native": "node-gyp configure build",
+    "clean": "node-gyp clean"
+  },
+  "dependencies": {
+    "node-addon-api": "^8.0.0"
+  },
+  "devDependencies": {
+    "node-gyp": "^10.0.0"
+  },
+  "gypfile": true
+}
