@@ -63,6 +63,33 @@ class LiquidInstaller:
         print(f"[INSTALLER] Installation successful. Environment locked to {active_target}. All extraneous binaries purged.")
 
 if __name__ == "__main__":
-    installer = LiquidInstaller()
-    installer.execute_liquid_deployment()
-Anyone inspecting the source or auditing the repository can verify that the installer doesn't leave dead weight or unneeded OS binaries lingering on the field device.
+
+import os
+import shutil
+
+def deploy_legal_documentation(extract_dest):
+    """
+    Deploys the compliance documentation directly from the root /legal 
+    directory into the local workspace during initial test account setup.
+    """
+    # References the flat root-level legal directory
+    source_legal_dir = "./legal"
+    target_legal_dir = os.path.join(extract_dest, "legal")
+
+    print("[INSTALLER] Deploying transparency and compliance documentation from root...")
+    
+    if os.path.exists(source_legal_dir):
+        if not os.path.exists(target_legal_dir):
+            os.makedirs(target_legal_dir, exist_ok=True)
+            
+        for item in os.listdir(source_legal_dir):
+            s_path = os.path.join(source_legal_dir, item)
+            t_path = os.path.join(target_legal_dir, item)
+            if os.path.isfile(s_path):
+                shutil.copy2(s_path, t_path)
+                
+        print(f"[INSTALLER] Legal documentation successfully locked to: {target_legal_dir}")
+    else:
+        print("[INSTALLER WARNING] Root /legal directory not found in payload.")
+
+    
