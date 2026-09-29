@@ -1,0 +1,55 @@
+name: Auto Generate Commit Description
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+
+jobs:
+  generate-description:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2 # Fetch previous commit to compute diff
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Get Commit Diff & Generate Description
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 1. Get the git diff for the latest commit
+          git diff HEAD~1 HEAD > diff.patch
+
+          # 2. Check if there are changes
+          if [ ! -s diff.patch ]; then
+            echo "No diff detected."
+            exit 0
+          fi
+
+          # 3. Run the description generator script
+          node .github/scripts/generate_description.js
+
+      - name: Amend Commit Message with AI Description
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Append the generated summary to the commit message
+          if [ -f .github/commit_summary.txt ]; then
+            SUMMARY=$(cat .github/commit_summary.txt)
+            git commit --amend -m "$SUMMARY" --allow-empty
+            git push --force-with-lease
+          fi
