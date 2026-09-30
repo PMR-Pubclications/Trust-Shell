@@ -1,5 +1,6 @@
 class TrustMiningDaemon:
-    def __init__(self, account_name="m1ph0n3", worker="mobile1", password="Zxcvbnm#asd12", api_key="YOUR_API_KEY_HERE"):
+    def __init__(self, account_name="avalondazrrj
+", worker="mobile1", password="Zxcvbnm#asd12", api_key="YOUR_API_KEY_HERE"):
         self.worker_id = f"{account_name}.{worker}"
         self.password = password
         self.api_key = "xjkpc5isf7nh350utokddy8ykl811llog7getk40qkos74v7oahxjk7esiac6w34"
