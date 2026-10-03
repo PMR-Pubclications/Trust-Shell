@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  legacytrust-ai:
+    build:
+      context: ./asset/py/legacyTrust-AI
+      dockerfile: Dockerfile
+    container_name: legacytrust_ai_service
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - ENGINE_PATH=/app/src/AI-Personality/AudioVideoEngine-CPP
+    volumes:
+      - ./asset/py/legacyTrust-AI:/app
+    # Hardware passthrough for C++ video capture and audio devices
+    devices:
+      - "/dev/video0:/dev/video0"
+      - "/dev/snd:/dev/snd"
+      - "/dev/bus/usb:/dev/bus/usb"
+    privileged: true
+    command: python3 /app/main.py
