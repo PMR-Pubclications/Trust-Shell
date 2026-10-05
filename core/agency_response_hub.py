@@ -1,39 +1,34 @@
+import sys
+import os
 import time
-from enum import Enum
-from typing import Dict, Any, Callable
 
-class ResponseStatus(str, Enum):
-    AVAILABLE = "AVAILABLE"
-    RESPONDING = "RESPONDING"
-    ON_SCENE = "ON_SCENE"
-    BUSY = "BUSY"
-    OFF_DUTY = "OFF_DUTY"
+# Point Trust-Shell to Trust-Main modules path
+TRUST_MAIN_MODULES = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../Trust-Main/modules"))
+if os.path.exists(TRUST_MAIN_MODULES) and TRUST_MAIN_MODULES not in sys.path:
+    sys.path.insert(0, TRUST_MAIN_MODULES)
 
 class AgencyResponseHub:
     def __init__(self):
-        # Register response generators for each module
-        self._agency_handlers: Dict[str, Callable[[], Dict[str, Any]]] = {}
+        self._handlers = {}
+        self._load_module_adapters()
 
-    def register_module(self, agency_name: str, status_callback: Callable[[], Dict[str, Any]]):
-        self._agency_handlers[agency_name.upper()] = status_callback
+    def _load_module_adapters(self):
+        # 1. EMS Module Adapter
+        try:
+            from ems.ems_ai_module import EMSAIResponder
+            ems_node = EMSAIResponder()
+            self._handlers["EMS"] = lambda: ems_node.run_live_cycle()
+        except ImportError:
+            self._handlers["EMS"] = lambda: {"status": "OFFLINE", "reason": "modules/ems unlinked"}
 
-    def broadcast_ping(self, incident_id: str = None) -> Dict[str, Any]:
-        """Queries EMS, Fire, and Police modules for status and telemetry summaries."""
-        now = time.time()
-        responses = {}
+        # 2. Fire Module Adapter Placeholder
+        self._handlers["FIRE"] = lambda: {"status": "ONLINE", "hazmat": "NOMINAL", "timestamp": time.time()}
 
-        for agency, callback in self._agency_handlers.items():
-            try:
-                responses[agency] = callback()
-            except Exception as ex:
-                responses[agency] = {
-                    "status": ResponseStatus.OFF_DUTY.value,
-                    "error": f"Module unreachable: {str(ex)}",
-                    "timestamp": now
-                }
+        # 3. Police Module Adapter Placeholder
+        self._handlers["POLICE"] = lambda: {"status": "ONLINE", "ballistics": "STANDBY", "timestamp": time.time()}
 
-        return {
-            "dispatch_timestamp": now,
-            "incident_id": incident_id or "ROUTINE_PULSE",
-            "agencies": responses
-        }
+    def poll_all_agencies(self) -> dict:
+        results = {}
+        for agency, handler in self._handlers.items():
+            results[agency] = handler()
+        return results
