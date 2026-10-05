@@ -1,3 +1,10 @@
+
+// Trust-Main automatically extracts the IP from the incoming network connection header:
+const client_ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+
+
+
+
 const { spawn } = require('child_process');
 const express = require('express');
 const app = express();
