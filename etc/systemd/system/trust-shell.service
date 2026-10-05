@@ -1,0 +1,38 @@
+[Unit]
+Description=Trust-Shell Forensic Service & Offline Buffer
+After=network.target local-fs.target
+Wants=network-online.target
+ConditionPathExists=/var/lib/trust_shell
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/trust-shell
+
+# Pre-start check: Verify /var/lib/trust_shell permissions are strictly 700 before launch
+ExecStartPre=/bin/bash -c '/usr/bin/test -d /var/lib/trust_shell && /usr/bin/test "$(/usr/bin/stat -c %%a /var/lib/trust_shell)" = "700"'
+
+# Executable launch point
+ExecStart=/usr/bin/node /opt/trust-shell/index.js
+Restart=always
+RestartSec=5s
+
+# System Environment Variables
+Environment=NODE_ENV=production
+Environment=TRUST_SHELL_DB_PATH=/var/lib/trust_shell/trust_shell_queue.db
+Environment=TRUST_SHELL_TPM_CTX=/var/lib/trust_shell/tpm_hmac.ctx
+
+# Systemd Security Hardening Bounds
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/trust_shell /opt/trust-shell
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+DeviceAllow=/dev/tpmrm0 rw
+DeviceAllow=/dev/tpm0 rw
+
+[Install]
+WantedBy=multi-user.target
