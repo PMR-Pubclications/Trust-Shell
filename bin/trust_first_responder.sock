@@ -1,0 +1,154 @@
+#!/usr/bin/env python3
+import curses
+import socket
+import json
+import struct
+import time
+import os
+
+SOCKET_PATH = "/tmp/trust_first_responder.sock"
+
+def fetch_ipc_telemetry() -> dict:
+    """Reads telemetry frame directly from the Unix Domain Socket."""
+    if not os.path.exists(SOCKET_PATH):
+        return {"status": "OFFLINE", "reason": "Socket file does not exist"}
+
+    try:
+        client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        client.settimeout(0.3)
+        client.connect(SOCKET_PATH)
+        
+        raw_len = client.recv(4)
+        if not raw_len:
+            client.close()
+            return {"status": "ERROR", "reason": "Empty socket stream"}
+            
+        payload_len = struct.unpack('!I', raw_len)[0]
+        data = bytearray()
+        
+        while len(data) < payload_len:
+            packet = client.recv(4096)
+            if not packet:
+                break
+            data.extend(packet)
+            
+        client.close()
+        payload = json.loads(data.decode('utf-8'))
+        payload["status"] = "ONLINE"
+        return payload
+    except socket.timeout:
+        return {"status": "TIMEOUT", "reason": "IPC connection timed out"}
+    except Exception as ex:
+        return {"status": "ERROR", "reason": str(ex)}
+
+def draw_dashboard(stdscr):
+    # Curses Initialization
+    curses.curs_set(0)
+    stdscr.nodelay(True)
+    stdscr.timeout(500)  # Refresh loop every 500ms
+    
+    # Color palette definition
+    curses.start_color()
+    curses.use_default_colors()
+    curses.init_pair(1, curses.COLOR_GREEN, -1)   # Online / Normal
+    curses.init_pair(2, curses.COLOR_RED, -1)     # Alert / Error / High Temp
+    curses.init_pair(3, curses.COLOR_CYAN, -1)    # Headers & Borders
+    curses.init_pair(4, curses.COLOR_YELLOW, -1)  # Warnings / Standby
+
+    while True:
+        key = stdscr.getch()
+        if key in (ord('q'), ord('Q'), 27):  # 27 = ESC
+            break
+
+        stdscr.erase()
+        height, width = stdscr.getmaxyx()
+
+        # Terminal dimensions guard
+        if height < 18 or width < 64:
+            stdscr.addstr(0, 0, "Terminal frame too small! Resize to >= 64x18.", curses.color_pair(2))
+            stdscr.refresh()
+            continue
+
+        # Title Bar
+        header = " TRUST-SHELL // IPC SYSTEM CONTROL & MONITORING "
+        stdscr.attron(curses.color_pair(3) | curses.A_BOLD)
+        stdscr.addstr(0, max(0, (width - len(header)) // 2), header)
+        stdscr.attroff(curses.color_pair(3) | curses.A_BOLD)
+        stdscr.hline(1, 0, curses.ACS_HLINE, width)
+
+        # Query IPC
+        telemetry = fetch_ipc_telemetry()
+        status = telemetry.get("status", "UNKNOWN")
+
+        # Daemon Connection Status
+        stdscr.addstr(3, 2, "IPC Endpoint : ", curses.A_BOLD)
+        stdscr.addstr(SOCKET_PATH)
+        
+        stdscr.addstr(4, 2, "Daemon Link  : ", curses.A_BOLD)
+        if status == "ONLINE":
+            stdscr.addstr("[ ONLINE ]", curses.color_pair(1) | curses.A_BOLD)
+        else:
+            stdscr.addstr(f"[ {status} ]", curses.color_pair(2) | curses.A_BOLD)
+            if "reason" in telemetry:
+                stdscr.addstr(f" - {telemetry['reason']}", curses.color_pair(4))
+
+        # Hardware Sensor Metrics Section
+        stdscr.hline(6, 0, curses.ACS_HLINE, width)
+        stdscr.addstr(7, 2, "FIRSTRESPONDER HARDWARE TELEMETRY", curses.color_pair(3) | curses.A_BOLD)
+
+        if status == "ONLINE":
+            sensor = telemetry.get("sensor", "N/A")
+            frame_w = telemetry.get("width", 0)
+            frame_h = telemetry.get("height", 0)
+            min_temp = telemetry.get("min_temp_c", 0.0)
+            max_temp = telemetry.get("max_temp_c", 0.0)
+            ts = telemetry.get("timestamp", 0)
+            time_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts)) if ts else "N/A"
+
+            stdscr.addstr(8, 4, f"Sensor Unit    : {sensor}")
+            stdscr.addstr(9, 4, f"Frame Geometry : {frame_w} x {frame_h} px")
+            stdscr.addstr(10, 4, f"Min Temperature: {min_temp:.2f} °C")
+            
+            temp_attr = curses.color_pair(2) | curses.A_BOLD if max_temp >= 45.0 else curses.A_NORMAL
+            stdscr.addstr(11, 4, f"Max Temperature: {max_temp:.2f} °C", temp_attr)
+            stdscr.addstr(12, 4, f"Telemetry Sync : {time_str}")
+        else:
+            stdscr.addstr(9, 4, "Awaiting hardware data stream from Unix socket...", curses.color_pair(4))
+
+        # Module Status Matrix
+        stdscr.hline(14, 0, curses.ACS_HLINE, width)
+        stdscr.addstr(15, 2, "SUBSYSTEM MODULE MATRIX", curses.color_pair(3) | curses.A_BOLD)
+
+        modules = [
+            ("firstResponder", "Radiometric & Audio Streaming", status),
+            ("ems", "Thermal Bleeding & Voice AI", "ACTIVE" if status == "ONLINE" else "STANDBY"),
+            ("fire", "Flashover Risk & Hazmat Engine", "ACTIVE" if status == "ONLINE" else "STANDBY"),
+            ("police", "Ballistics Vector & Chain-of-Custody", "ACTIVE" if status == "ONLINE" else "STANDBY"),
+        ]
+
+        row = 16
+        for mod_name, mod_desc, mod_stat in modules:
+            if row >= height - 3:
+                break
+            stdscr.addstr(row, 4, f"• {mod_name:<16}", curses.A_BOLD)
+            stdscr.addstr(row, 22, f"{mod_desc:<36}")
+            
+            stat_color = curses.color_pair(1) if mod_stat in ("ONLINE", "ACTIVE") else curses.color_pair(4)
+            stdscr.addstr(row, 60 if width > 70 else 56, f"[{mod_stat}]", stat_color | curses.A_BOLD)
+            row += 1
+
+        # Footer Status Bar
+        stdscr.hline(height - 2, 0, curses.ACS_HLINE, width)
+        footer = " Press [Q] or [ESC] to Exit Shell Dashboard | Auto-Refresh: 500ms "
+        stdscr.addstr(height - 1, max(0, (width - len(footer)) // 2), footer, curses.A_DIM)
+
+        stdscr.refresh()
+
+def main():
+    try:
+        curses.wrapper(draw_dashboard)
+    except KeyboardInterrupt:
+        pass
+
+if __name__ == "__main__":
+    main()
