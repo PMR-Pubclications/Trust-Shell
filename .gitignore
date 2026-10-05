@@ -216,3 +216,15 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# .gitignore
+node_modules/
+*.db
+*.db-wal
+*.db-shm
+*.ctx
+*.log
+/tmp/
+test-*.json
+mock-*.json
+
