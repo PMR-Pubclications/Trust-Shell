@@ -1,0 +1,107 @@
+name: Build All Platforms Matrix
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: ${{ matrix.platform.name }}
+    runs-on: ${{ matrix.platform.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - name: Windows x64 (.exe)
+            os: windows-latest
+            working-dir: windows
+            spec-file: trust_shell.spec
+            artifact-name: Trust-Shell-Windows
+            binary-path: windows/dist/Trust-Shell.exe
+
+          - name: Linux x64 (Binary)
+            os: ubuntu-latest
+            working-dir: linux
+            spec-file: trust_shell.spec
+            artifact-name: Trust-Shell-Linux
+            binary-path: linux/dist/trust-shell
+
+          - name: macOS x64/Silicon (App)
+            os: macos-latest
+            working-dir: macos
+            spec-file: trust_shell.spec
+            artifact-name: Trust-Shell-macOS
+            binary-path: macos/dist/trust-shell
+
+          - name: Android (APK)
+            os: ubuntu-latest
+            # Uncomment and point to your mobile app directory if using Flutter/React Native
+            working-dir: mobile 
+            artifact-name: Trust-Shell-Android-APK
+            binary-path: mobile/build/app/outputs/flutter-apk/app-release.apk
+
+          - name: iOS (Archive)
+            os: macos-latest
+            working-dir: mobile
+            artifact-name: Trust-Shell-iOS-Archive
+            binary-path: mobile/build/ios/iphoneos/Runner.app
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      if: contains(matrix.platform.name, 'Windows') || contains(matrix.platform.name, 'Linux') || contains(matrix.platform.name, 'macOS')
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Install Python Dependencies & Build Desktop Binaries
+      if: contains(matrix.platform.name, 'Windows') || contains(matrix.platform.name, 'Linux') || contains(matrix.platform.name, 'macOS')
+      working-directory: ${{ matrix.platform.working-dir }}
+      run: |
+        python -m pip install --upgrade pip
+        if [ -f "../requirements.txt" ]; then pip install -r ../requirements.txt; fi
+        pip install pyinstaller
+        pyinstaller ${{ matrix.platform.spec-file }}
+
+    # Mobile Build Step (Example config using Flutter toolchain as a standard cross-platform wrapper)
+    - name: Set up Java (for Android)
+      if: contains(matrix.platform.name, 'Android')
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'zulu'
+        java-version: '17'
+
+    - name: Set up Flutter (for Mobile)
+      if: contains(matrix.platform.name, 'Android') || contains(matrix.platform.name, 'iOS')
+      uses: subosito/flutter-action@v3
+      with:
+        flutter-version: '3.19.x'
+        channel: 'stable'
+        cache: true
+
+    - name: Build Android APK
+      if: contains(matrix.platform.name, 'Android')
+      working-directory: ${{ matrix.platform.working-dir }}
+      run: |
+        flutter pub get
+        flutter build apk --release
+
+    - name: Build iOS App
+      if: contains(matrix.platform.name, 'iOS')
+      working-directory: ${{ matrix.platform.working-dir }}
+      run: |
+        flutter pub get
+        flutter build ios --release --no-codesign
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.platform.artifact-name }}
+        path: ${{ matrix.platform.binary-path }}
