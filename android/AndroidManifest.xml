@@ -1,2 +1,4 @@
 android.permissions = INTERNET, READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE, CAMERA
 <uses-permission android:name="android.permission.INTERNET" />
+android:usesCleartextTraffic="true"
+
