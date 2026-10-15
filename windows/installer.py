@@ -1,11 +1,12 @@
 # -*- mode: python ; coding: utf-8 -*-
+
 block_cipher = None
 
 a = Analysis(
-    ['main.py'],
-    pathex=[],
+    ['../main.py'],  # Points back to the root entry point if main.py is in the repo root
+    pathex=['../'],
     binaries=[],
-    datas=[('assets/', 'assets/')], # Include your UI/config assets
+    datas=[],        # Left empty since there is no assets folder
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -16,6 +17,7 @@ a = Analysis(
     cipher=block_cipher,
     noarchive=False,
 )
+
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 exe = EXE(
@@ -32,11 +34,10 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False, # Set to True if you need a debug console window
+    console=False,           # Change to True if you need a command prompt visible for logs
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='assets/icon.ico'
 )
