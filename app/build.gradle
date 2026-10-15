@@ -4,16 +4,16 @@ plugins {
 }
 
 android {
-    namespace 'org.trust.forensicshell'
+    namespace 'org.trust.forensicshell' // Keep your package namespace here
     compileSdk 34
 
     defaultConfig {
-        applicationId 'org.trust.forensicshell'
-        minSdk 26
+        applicationId "com.pmr.trustshell" // Choose your final application ID
+        minSdk 26                          // API 26+ is recommended for modern AndroidX libs
         targetSdk 34
         versionCode 1
-        versionName '1.0.0'
-        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+        versionName "1.0.0"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
