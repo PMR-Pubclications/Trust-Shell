@@ -2,6 +2,9 @@
 
 block_cipher = None
 
+hiddenimports=['requests', 'json', 'sqlite3', 'cryptography'],
+
+
 a = Analysis(
     ['../main.py'],  # Points back to the root entry point if main.py is in the repo root
     pathex=['../'],
