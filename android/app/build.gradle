@@ -1,0 +1,11 @@
+android {
+    compileSdkVersion 34
+
+    defaultConfig {
+        applicationId "com.pmr.trustshell"
+        minSdkVersion 21
+        targetSdkVersion 34
+        versionCode 1
+        versionName "1.0"
+    }
+}
