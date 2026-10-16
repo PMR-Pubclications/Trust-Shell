@@ -58,3 +58,224 @@ def bootstrap_liquid_installation():
 if __name__ == "__main__":
     bootstrap_liquid_installation()
 
+// Octokit.js
+// https://github.com/octokit/core.js#readme
+const octokit = new Octokit({
+  auth: 'SHA256:k3TGepNEGkYF5CYrLaiuXPBLtDWRYHMJbjRmkc7Zg3o='
+})
+
+await octokit.request('GET /orgs/{org}/actions/hosted-runners/{hosted_runner_id}', {
+  org: 'PMR Publcations',
+  hosted_runner_id: 'HOSTED_RUNNER_ID',
+  headers: {
+    'X-GitHub-Api-Version': '2026-03-10'
+  }
+})
+
+Response schema
+Status: 200
+{
+  "title": "GitHub-hosted hosted runner",
+  "description": "A Github-hosted hosted runner.",
+  "type": "object",
+  "properties": {
+    "id": {
+      "description": "The unique identifier of the hosted runner.",
+      "type": "integer"
+    },
+    "name": {
+      "description": "The name of the hosted runner.",
+      "type": "string"
+    },
+    "runner_group_id": {
+      "description": "The unique identifier of the group that the hosted runner belongs to.",
+      "type": "integer"
+    },
+    "image_details": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "title": "GitHub-hosted runner image details.",
+          "description": "Provides details of a hosted runner image",
+          "type": "object",
+          "properties": {
+            "id": {
+              "description": "The ID of the image. Use this ID for the `image` parameter when creating a new larger runner.",
+              "type": "string"
+            },
+            "size_gb": {
+              "description": "Image size in GB.",
+              "type": "integer"
+            },
+            "display_name": {
+              "description": "Display name for this image.",
+              "type": "string"
+            },
+            "source": {
+              "description": "The image provider.",
+              "type": "string",
+              "enum": [
+                "github",
+                "partner",
+                "custom"
+              ]
+            },
+            "version": {
+              "description": "The image version of the hosted runner pool.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "size_gb",
+            "display_name",
+            "source"
+          ]
+        }
+      ]
+    },
+    "machine_size_details": {
+      "title": "Github-owned VM details.",
+      "description": "Provides details of a particular machine spec.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "The ID used for the `size` parameter when creating a new runner.",
+          "type": "string"
+        },
+        "cpu_cores": {
+          "description": "The number of cores.",
+          "type": "integer"
+        },
+        "memory_gb": {
+          "description": "The available RAM for the machine spec.",
+          "type": "integer"
+        },
+        "storage_gb": {
+          "description": "The available SSD storage for the machine spec.",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "cpu_cores",
+        "memory_gb",
+        "storage_gb"
+      ]
+    },
+    "status": {
+      "description": "The status of the runner.",
+      "type": "string",
+      "enum": [
+        "Ready",
+        "Provisioning",
+        "Shutdown",
+        "Deleting",
+        "Stuck"
+      ]
+    },
+    "platform": {
+      "description": "The operating system of the image.",
+      "type": "string"
+    },
+    "maximum_runners": {
+      "description": "The maximum amount of hosted runners. Runners will not scale automatically above this number. Use this setting to limit your cost.",
+      "type": "integer",
+      "default": 10
+    },
+    "public_ip_enabled": {
+      "description": "Whether public IP is enabled for the hosted runners.",
+      "type": "boolean"
+    },
+    "public_ips": {
+      "description": "The public IP ranges when public IP is enabled for the hosted runners.",
+      "type": "array",
+      "items": {
+        "title": "Public IP for a GitHub-hosted larger runners.",
+        "description": "Provides details of Public IP for a GitHub-hosted larger runners",
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "description": "Whether public IP is enabled.",
+            "type": "boolean"
+          },
+          "prefix": {
+            "description": "The prefix for the public IP.",
+            "type": "string"
+          },
+          "length": {
+            "description": "The length of the IP prefix.",
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "last_active_on": {
+      "description": "The time at which the runner was last used, in ISO 8601 format.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "image_gen": {
+      "type": "boolean",
+      "description": "Whether custom image generation is enabled for the hosted runners."
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "image_details",
+    "machine_size_details",
+    "status",
+    "public_ip_enabled",
+    "platform"
+  ]
+}
+
+# Authenticating with a GitHub App on behalf of a user
+
+Your GitHub App can perform actions on behalf of a user, like creating an issue, posting a comment, or creating a deployment.
+
+Your app can make API requests on behalf of a user. API requests made by an app on behalf of a user will be attributed to that user. For example, if your app posts a comment on behalf of a user, the GitHub UI will show the user's avatar photo along with the app's identicon badge as the author of the issue.
+
+![Screenshot of a comment that has a user avatar with an overlaid app identicon badge. The avatar is highlighted with an orange outline.](/assets/images/help/apps/github-app-acting-on-your-behalf.png)
+
+Similarly, if the request triggers a corresponding entry in the audit logs and security logs, the logs will list the user as the actor but will state that the "programmatic\_access\_type" is "GitHub App user-to-server token".
+
+To make an API request on behalf of a user, the user must authorize your app. If an app is installed on an organization that includes multiple members, each member will need to authorize the app before the app can act on their behalf. An app does not need to be installed in order for a user to authorize the app.
+
+When a user installs an app on an account, they grant the app permission to access the resources that it requested. During the installation process, they will also see a list of account permissions that the app can request for individual users. When a user authorizes an app, they grant the app permission to act on their behalf, and they grant the account permissions that the app requested.
+
+Once a user has authorized your app, you can generate a user access token, which is a type of OAuth token. You should send the user access token in the `Authorization` header of your subsequent API requests. For more information about prompting a user to authorize your app and generating a user access token, see [Generating a user access token for a GitHub App](/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-user-access-token-for-a-github-app).
+
+When operating on behalf of a user, your app's access is limited to ensure secure and appropriate access:
+
+* The app can only access resources that the user has access to. If a user does not have access to a repository, your app cannot access that repository on their behalf even if the app is installed on that repository.
+* The app can only access resources that it has permission to access. If your app does not have the `Issues` permission, it cannot create or read issues for the user, even if the user has access to the repository.
+* The app can only access resources in an account where it is installed. If your app is only installed on a user's personal account, it cannot access resources in an organization that the user is a member of unless the app is also installed on that organization.
+
+Requests made with a user access token are sometimes called "user-to-server" requests.
+
+A token has the same capabilities to access resources and perform actions on those resources that the owner of the token has, and is further limited by any scopes or permissions granted to the token. A token cannot grant additional access capabilities to a user.
+
+If you want to attribute app activity to the app instead of to a user, you should authenticate as an app installation instead. For more information, see [Authenticating as a GitHub App installation](/en/apps/creating-github-apps/authenticating-with-a-github-app/authenticating-as-a-github-app-installation).
+
+> \[!NOTE]
+> If a user reports that they cannot see resources owned by their organization after authorizing your GitHub App and the organization uses SAML SSO, instruct the user to start an active SAML session for their organization before reauthorizing. For more information, see [SAML and GitHub Apps](/en/enterprise-cloud@latest/apps/using-github-apps/saml-and-github-apps) in the GitHub Enterprise Cloud documentation.
+
+curl --request GET \
+--url "https://api.github.com/user" \
+--header "Accept: application/vnd.github+json" \
+--header "Authorization: Bearer SHA256:k3TGepNEGkYF5CYrLaiuXPBLtDWRYHMJbjRmkc7Zg3o=" \
+--header "X-GitHub-Api-Version: 2026-03-10"
+
+curl --request GET \
+--url "https://api.github.com/user" \
+--header "Accept: application/vnd.github+json" \
+--header "Authorization: Bearer SHA256:k3TGepNEGkYF5CYrLaiuXPBLtDWRYHMJbjRmkc7Zg3o=" \
+--header "X-GitHub-Api-Version: 2026-03-10"
+
