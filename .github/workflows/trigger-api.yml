@@ -6,6 +6,6 @@ on:
 
 jobs:
   call-central:
-    uses: PMR-PUBCLICATIONS/Trust-Main/.github/workflows/shared-api-pipeline.yml@main
+    uses: PMR-Pubclications/Trust-Main/.github/workflows/shared-api-pipeline.yml@main
     secrets:
       SCRAMBLED_API_KEY: ${{ secrets.SCRAMBLED_API_KEY }}
