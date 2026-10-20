@@ -1,0 +1,11 @@
+name: Trigger Central API
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  call-central:
+    uses: PMR-PUBCLICATIONS/Trust-Main/.github/workflows/shared-api-pipeline.yml@main
+    secrets:
+      SCRAMBLED_API_KEY: ${{ secrets.SCRAMBLED_API_KEY }}
