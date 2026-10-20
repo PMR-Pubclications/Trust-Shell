@@ -1,0 +1,6 @@
+# Ignore build artifacts and large logs
+build/
+  dist/
+  node_modules/
+  *.log
+  *.bin
