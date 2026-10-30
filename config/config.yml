@@ -1,0 +1,6 @@
+# config.yaml (inside Trust-Main, Trust-Shell, etc.)
+security:
+  handshake_protocol: "HMAC-SHA256"
+  target_diagnostic_repo: "my_diagnostic_project"
+  shared_secret_env_var: "REPO_SHARED_SECRET"
+  token_expiration_seconds: 300
