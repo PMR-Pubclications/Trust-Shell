@@ -1,6 +1,27 @@
-# config.yaml (inside Trust-Main, Trust-Shell, etc.)
+# ==========================================
+# TRUST-SHELL CONFIGURATION FILE
+# ==========================================
+
+project:
+  name: "Trust-Shell"
+  version: "1.0.0"
+  role: "User Interface & Voice Routing"
+
+# Security & Handshake Settings (Links with Diagnostic Core)
 security:
   handshake_protocol: "HMAC-SHA256"
   target_diagnostic_repo: "my_diagnostic_project"
   shared_secret_env_var: "REPO_SHARED_SECRET"
   token_expiration_seconds: 300
+
+# Voice & Shell Routing Settings
+shell:
+  input_mode: "voice_and_text"
+  audio_stream_buffer_size: 1024
+  routing_endpoint: "local_pipe_or_socket_2"
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  format: "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+  save_to_file: true
