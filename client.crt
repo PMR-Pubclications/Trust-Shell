@@ -1,0 +1,46 @@
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+#include <iostream>
+
+bool InitializeMTLSContext(SSL_CTX*& out_ctx) {
+    // Initialize OpenSSL
+    SSL_library_init();
+    OpenSSL_add_all_algorithms();
+    SSL_load_error_strings();
+
+    // Create TLS client context
+    const SSL_METHOD* method = TLS_client_method();
+    out_ctx = SSL_CTX_new(method);
+    if (!out_ctx) {
+        std::cerr << "Failed to create SSL_CTX" << std::endl;
+        return false;
+    }
+
+    // Load Root CA to verify the server
+    if (SSL_CTX_load_verify_locations(out_ctx, "localCA.crt", nullptr) <= 0) {
+        std::cerr << "Failed to load localCA.crt" << std::endl;
+        return false;
+    }
+
+    // Load Client Certificate
+    if (SSL_CTX_use_certificate_file(out_ctx, "client.crt", SSL_FILETYPE_PEM) <= 0) {
+        std::cerr << "Failed to load client.crt" << std::endl;
+        return false;
+    }
+
+    // Load Client Private Key
+    if (SSL_CTX_use_PrivateKey_file(out_ctx, "client.key", SSL_FILETYPE_PEM) <= 0) {
+        std::cerr << "Failed to load client.key" << std::endl;
+        return false;
+    }
+
+    // Verify that the private key matches the certificate
+    if (!SSL_CTX_check_private_key(out_ctx)) {
+        std::cerr << "Client private key does not match the certificate public key" << std::endl;
+        return false;
+    }
+
+    // Require server certificate verification
+    SSL_CTX_set_verify(out_ctx, SSL_VERIFY_PEER, nullptr);
+    return true;
+}
