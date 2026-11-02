@@ -1,80 +1,68 @@
 #!/usr/bin/env python3
 """
-/opt/trust-shell/auth/handshake_client.py
-Trust-Shell Handshake Client.
-Generates the cryptographic hardware attestation token and transmits it 
-to the AnnonOS kernel gatekeeper for secure session authorization.
+/opt/annonos/core/security/handshake_enforcer.py
+AnnonOS Application Gatekeeper & Handshake Enforcer.
+Intercepts all application installation and execution requests. Automatically authorizes 
+official signed modules (such as Trust-Shell) while instantly rejecting unauthorized 
+binaries missing a valid hardware-rooted cryptographic handshake.
 """
 
 import os
+import sys
 import hmac
 import hashlib
 import logging
-import requests  # Or local IPC socket in production
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+
+# Add ledger path to log security violations
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../chain_of_custody")))
+from merkle_builder import MerkleLedger
 
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] [TrustShell-Client]: %(message)s'
+    format='%(asctime)s [%(levelname)s] [AnnonOS-Gatekeeper]: %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-class TrustShellHandshakeClient:
-    def __init__(self):
-        self.app_name = "Trust-Shell"
-        self.publisher_id = "ANNONOS_OFFICIAL_TRUST_ROOT_2026"
-        # Shared secret or secure hardware enclave seed for token generation
-        self._secret_seed = b"ANNONOS_SECURE_ROOT_SEED_2026"
-        self.binary_path = "/opt/trust-shell/bin/trust_shell_main.bin"
-
-    def generate_handshake_token(self) -> str:
-        """Computes the cryptographic HMAC handshake proof."""
-        message = f"{self.app_name}:{self.publisher_id}:{self.binary_path}".encode('utf-8')
-        token = hmac.new(self._secret_seed, message, hashlib.sha256).hexdigest()
-        return token
-
-    def request_kernel_authorization(self) -> bool:
-        """
-        Transmits the handshake payload to the AnnonOS kernel gatekeeper.
-        """
-        token = self.generate_handshake_token()
-        logger.info(f"Generated secure handshake token for [{self.app_name}].")
+class AnnonOSAppGatekeeper:
+    def __init__(self, ledger_db_path: str = "/opt/annonos/data/ledger.db"):
+        self.ledger = MerkleLedger(db_path=ledger_db_path)
         
-        payload: Dict[str, Any] = {
-            "app_name": self.app_name,
-            "publisher_id": self.publisher_id,
-            "handshake_token": token,
-            "binary_path": self.binary_path
+        # Hardcoded authorized cryptographic public identity for Trust-Shell
+        # In production, this matches the hardware root-of-trust certificate authority
+        self.AUTHORIZED_APPS = {
+            "Trust-Shell": {
+                "expected_publisher_id": "ANNONOS_OFFICIAL_TRUST_ROOT_2026",
+            }
         }
 
-        logger.info("Transmitting cryptographic handshake to AnnonOS kernel gatekeeper...")
-        
-        # In a local OS environment, this imports and calls the gatekeeper directly:
-        try:
-            # Dynamically import the AnnonOS gatekeeper module
-            import sys
-            sys.path.append("/opt/annonos/core/security")
-            from handshake_enforcer import AnnonOSAppGatekeeper
-            
-            gatekeeper = AnnonOSAppGatekeeper()
-            is_authorized = gatekeeper.verify_and_authorize_app(
-                app_name=payload["app_name"],
-                publisher_id=payload["publisher_id"],
-                handshake_token=payload["handshake_token"],
-                binary_path=payload["binary_path"]
-            )
-            
-            if is_authorized:
-                logger.info("Handshake accepted! Trust-Shell UI layer unlocked.")
-                return True
-            else:
-                logger.critical("Handshake rejected by AnnonOS kernel. Halting Trust-Shell.")
-                return False
+    @staticmethod
+    def _shared_secret() -> Optional[bytes]:
+        secret = os.environ.get("REPO_SHARED_SECRET")
+        return secret.encode("utf-8") if secret else None
 
-        except Exception as e:
-            logger.error(f"Failed to communicate with AnnonOS gatekeeper: {e}")
+    def _expected_token(self, app_name: str, publisher_id: str, binary_path: str) -> Optional[str]:
+        secret = self._shared_secret()
+        if secret is None:
+            return None
+        message = f"{app_name}:{publisher_id}:{binary_path}".encode("utf-8")
+        return hmac.new(secret, message, hashlib.sha256).hexdigest()
+
+    def verify_and_authorize_app(self, app_name: str, publisher_id: str, handshake_token: str, binary_path: str) -> bool:
+        """
+        Validates an incoming application's handshake token against the hardware root-of-trust.
+        Rejects any application that fails verification or is not explicitly recognized (like Trust-Shell).
+        """
+        logger.info(f"Intercepted installation request for application: [{app_name}]")
+
+        # Check 1: Is the application recognized in the sovereign whitelist?
+        if app_name not in self.AUTHORIZED_APPS:
+            reason = f"Unauthorized application '{app_name}' rejected. Not recognized by AnnonOS registry."
+            self._reject_and_log(app_name, binary_path, reason)
             return False
 
-if __name__ == "__main__":
-    client = TrustShellHandshakeClient()
-    client.request_kernel_authorization()
+        app_profile = self.AUTHORIZED_APPS[app_name]
+
+        # Check 2: Verify publisher identity cryptographic signature
+        if publisher_id != app_profile["expected_publisher_id"]:
+            reason = f"Cryptographic publisher mismatch for '{app_name}'. Expected root identity, got '{publisher_id}'."
